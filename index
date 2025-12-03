@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cold Case Archive: Gardner Museum Heist (Expanded)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Application Structure Plan:
+        The app is designed as a "Digital Case File" dashboard.
+        1. Sidebar Navigation: Allows easy jumping between Dashboard, Document Archives (the core reading resources), Suspect Board, and Evidence Locker.
+        2. Dashboard: High-level summary to hook the student (timeline chart, key stats).
+        3. Document Archives: This now lists 8 resources. Clicking one opens a "Reader Mode" overlay.
+        4. Suspect Board: Interactive cards for the 5 main theories.
+        5. Evidence Locker: Visual breakdown of stolen items.
+    -->
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 */
+        }
+        .serif-text {
+            font-family: 'Merriweather', serif;
+        }
+        /* Chart Container Utilities */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        
+        /* Custom Scrollbar for document reader */
+        .doc-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .doc-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .doc-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .doc-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .active-nav {
+            background-color: #e2e8f0;
+            border-right: 4px solid #2563eb;
+            font-weight: 600;
+        }
+        .mobile-menu-overlay {
+            background-color: #1e293b; /* Slate 800 */
+        }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex z-10">
+        <div class="p-6 border-b border-slate-100">
+            <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">CASE FILE: <span class="text-blue-600">GARDNER</span></h1>
+            <p class="text-xs text-slate-500 mt-1">ID: FBI-90-19-03</p>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1">
+                <li>
+                    <button onclick="router('dashboard')" id="nav-dashboard" class="w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 active-nav transition-colors">
+                        📊 Case Overview
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('documents')" id="nav-documents" class="w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                        📂 Document Archive
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('suspects')" id="nav-suspects" class="w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                        🕵️ Suspect Board
+                    </button>
+                </li>
+                <li>
+                    <button onclick="router('evidence')" id="nav-evidence" class="w-full text-left px-6 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                        🖼️ Stolen Inventory
+                    </button>
+                </li>
+            </ul>
+        </nav>
+        <div class="p-4 border-t border-slate-100 bg-slate-50">
+            <div class="text-xs text-slate-400">
+                Authorized Access Only<br>
+                Class 6 Research Clearance
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mobile Header -->
+    <div class="md:hidden fixed top-0 w-full bg-white border-b border-slate-200 z-20 flex justify-between items-center p-4">
+        <h1 class="text-lg font-bold text-slate-900">Gardner Case File</h1>
+        <button onclick="toggleMobileMenu()" class="text-slate-600 p-2 border rounded">Menu</button>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu" class="fixed inset-0 z-30 hidden flex flex-col justify-center items-center space-y-6 mobile-menu-overlay">
+        <button onclick="router('dashboard'); toggleMobileMenu()" class="text-white text-xl font-bold hover:text-blue-400">Case Overview</button>
+        <button onclick="router('documents'); toggleMobileMenu()" class="text-white text-xl font-bold hover:text-blue-400">Document Archive</button>
+        <button onclick="router('suspects'); toggleMobileMenu()" class="text-white text-xl font-bold hover:text-blue-400">Suspect Board</button>
+        <button onclick="router('evidence'); toggleMobileMenu()" class="text-white text-xl font-bold hover:text-blue-400">Stolen Inventory</button>
+        <button onclick="toggleMobileMenu()" class="text-slate-400 mt-8">Close</button>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-slate-50 pt-16 md:pt-0 relative">
+        <div class="max-w-5xl mx-auto p-6 md:p-10 min-h-full">
+            
+            <!-- SECTION: DASHBOARD -->
+            <section id="view-dashboard" class="space-y-8 animate-fade-in">
+                <div class="bg-white rounded-xl p-8 shadow-sm border border-slate-200">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-4 serif-text">The Incident</h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">
+                        Welcome, Investigator. On March 18, 1990, two men disguised as police officers entered the Isabella Stewart Gardner Museum in Boston. In 81 minutes, they committed the largest art theft in history. The case remains unsolved.
+                        <br><br>
+                        Your task is to explore the **Document Archive** (now 8 files), analyze the **Suspect Board** (5 theories), and use the evidence to formulate a theory. Who stole the art?
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                            <div class="text-sm text-blue-600 font-semibold uppercase tracking-wider">Date</div>
+                            <div class="text-2xl font-bold text-slate-800">March 18, 1990</div>
+                        </div>
+                        <div class="p-4 bg-amber-50 rounded-lg border border-amber-100">
+                            <div class="text-sm text-amber-600 font-semibold uppercase tracking-wider">Stolen Value</div>
+                            <div class="text-2xl font-bold text-slate-800">$500 Million+</div>
+                        </div>
+                        <div class="p-4 bg-red-50 rounded-lg border border-red-100">
+                            <div class="text-sm text-red-600 font-semibold uppercase tracking-wider">Time on Scene</div>
+                            <div class="text-2xl font-bold text-slate-800">81 Minutes</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Timeline of the Heist</h3>
+                        <p class="text-xs text-slate-500 mb-4">Duration of event in minutes compared to avg burglary.</p>
+                        <div class="chart-container">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-lg font-bold text-slate-800 mb-2">Value Comparison</h3>
+                        <p class="text-xs text-slate-500 mb-4">Estimated value vs. other famous thefts.</p>
+                        <div class="chart-container">
+                            <canvas id="valueChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: DOCUMENTS -->
+            <section id="view-documents" class="hidden space-y-6">
+                <div class="bg-white p-8 rounded-xl border border-slate-200">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2 serif-text">Document Archive (8 Files)</h2>
+                    <p class="text-slate-600 mb-6">
+                        This archive contains primary and secondary sources. Use these documents to gather evidence for your paper. Click on a file to read the full contents.
+                    </p>
+
+                    <div id="document-list" class="grid grid-cols-1 gap-4">
+                        <!-- JS Will Populate This -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: SUSPECTS -->
+            <section id="view-suspects" class="hidden space-y-6">
+                <div class="bg-white p-8 rounded-xl border border-slate-200">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2 serif-text">Suspect Board (5 Theories)</h2>
+                    <p class="text-slate-600 mb-6">
+                        Over the years, the FBI has tracked several key suspects and theories. Analyze their profiles below. You must decide which theory has the strongest proof.
+                    </p>
+                    <div id="suspect-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- JS Will Populate This -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: EVIDENCE -->
+            <section id="view-evidence" class="hidden space-y-6">
+                <div class="bg-white p-8 rounded-xl border border-slate-200">
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2 serif-text">Stolen Inventory</h2>
+                    <p class="text-slate-600 mb-6">
+                        13 items were taken. The selection was odd—some masterpieces were taken, while others of higher value were ignored. What does this tell you about the thieves?
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-slate-500 border-b border-slate-200 text-sm">
+                                    <th class="py-3 font-semibold">Artist</th>
+                                    <th class="py-3 font-semibold">Work Title</th>
+                                    <th class="py-3 font-semibold">Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table" class="text-slate-700 text-sm">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Document Reader Modal -->
+    <div id="doc-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900 bg-opacity-75 p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-3xl h-[85vh] rounded-xl shadow-2xl flex flex-col overflow-hidden relative">
+            
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <div>
+                    <h3 id="modal-title" class="font-bold text-slate-800 text-lg">Document Title</h3>
+                    <span id="modal-source" class="text-xs font-mono text-slate-500 uppercase tracking-widest">Source Name</span>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-200 transition">
+                    <span class="text-2xl">&times;</span>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="flex-1 overflow-y-auto p-8 doc-scroll bg-[#fdfbf7]"> <!-- Slightly off-white paper color -->
+                <div class="max-w-2xl mx-auto">
+                    <div id="modal-content" class="serif-text text-slate-800 leading-relaxed text-lg space-y-6">
+                        <!-- Content goes here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs text-slate-500">
+                <span>Ref: CASE-90-XYZ</span>
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 transition">Close File</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA STORAGE ---
+
+        const documents = [
+            {
+                id: 1,
+                title: "Thieves Strike Gardner Museum",
+                source: "The Boston Morning Gazette",
+                date: "March 19, 1990",
+                type: "Newspaper Article",
+                preview: "BOSTON — In a brazen act that has shocked the art world, two men disguised as police officers...",
+                content: `
+                    <p><strong>BOSTON</strong> — In a brazen act that has shocked the art world, two men disguised as police officers entered the Isabella Stewart Gardner Museum early yesterday morning and escaped with masterpieces estimated to be worth hundreds of millions of dollars.</p>
+                    
+                    <p>The robbery, which lasted nearly an hour and a half, is already being called the largest art theft in history. Among the stolen items are three works by Rembrandt, including his only seascape, "The Storm on the Sea of Galilee," and a rare painting by Vermeer, "The Concert."</p>
+
+                    <p>According to initial reports, the thieves arrived at the museum's side entrance on Palace Road at approximately 1:24 a.m. They buzzed the security desk, claiming to be police officers responding to a disturbance call. Against museum protocol, the young security guard on duty, Richard Abath, 23, buzzed them in.</p>
+
+                    <p>"It appears to be a very professional job, yet also strangely amateur in parts," said a source close to the investigation. "They knew exactly how to handle the guards, but they cut the paintings out of the frames clumsily, leaving shards of canvas on the floor."</p>
+
+                    <p>The two guards on duty were found bound with duct tape in the museum's basement. Neither was injured. The FBI has immediately taken jurisdiction over the case due to the sheer value of the stolen property.</p>
+
+                    <p>Museum Director Anne Hawley issued a tearful plea this morning: "These works are irreplaceable. They belong to the public. We beg for their safe return."</p>
+                `
+            },
+            {
+                id: 2,
+                title: "Official Incident Report: 90-432-A",
+                source: "Boston Police Department / FBI",
+                date: "March 18, 1990",
+                type: "Police File",
+                preview: "TIME: 01:24. LOCATION: 280 The Fenway. INCIDENT: Robbery/B&E...",
+                content: `
+                    <div class="font-mono text-sm bg-slate-100 p-4 rounded border border-slate-300 mb-6">
+                        <strong>REPORT ID:</strong> 90-432-A<br>
+                        <strong>DATE:</strong> 18 MARCH 1990<br>
+                        <strong>OFFICER:</strong> SGT. P. O'MALLEY<br>
+                        <strong>LOCATION:</strong> ISABELLA STEWART GARDNER MUSEUM
+                    </div>
+
+                    <h4 class="font-bold border-b border-black mb-2">SEQUENCE OF EVENTS</h4>
+                    <p><strong>01:20 AM:</strong> Unidentified vehicle parked near Palace Road entrance. Described as a hatchback.</p>
+                    <p><strong>01:24 AM:</strong> Two white males, dressed in BPD uniforms, approach the employee entrance. They state they are responding to a disturbance. Guard R. Abath allows entry.</p>
+                    <p><strong>01:25 AM:</strong> Subjects order Guard Abath to step away from the desk. Subject 1 states, "You look familiar. Do I have a warrant for you?" Guard Abath steps out from behind the desk.</p>
+                    <p><strong>01:26 AM:</strong> Subjects handcuff Guard Abath and the second guard. Subjects inform guards: "Gentlemen, this is a robbery."</p>
+                    <p><strong>01:48 AM:</strong> Motion detectors record movement in the Dutch Room (2nd Floor). This is the location of the Rembrandts and the Vermeer.</p>
+                    <p><strong>01:51 AM:</strong> Motion detectors record movement in the Short Gallery.</p>
+                    <p><strong>02:41 AM:</strong> Motion detectors show movement back on the ground floor.</p>
+                    <p><strong>02:45 AM:</strong> Subjects exit the building. The guards remain bound in the basement until police arrival at 08:15 AM.</p>
+
+                    <h4 class="font-bold border-b border-black mb-2 mt-4">SUBJECT DESCRIPTIONS</h4>
+                    <p><strong>Subject 1:</strong> White male, approx 5'9", late 30s. Dark hair. Gold-rimmed glasses. Fake mustache (wax).</p>
+                    <p><strong>Subject 2:</strong> White male, approx 6'0", heavier build. Dark hair. Also wearing police uniform.</p>
+                `
+            },
+            {
+                id: 3,
+                title: "The Mob Connection",
+                source: "Crime Beat Magazine",
+                date: "August 1997",
+                type: "Investigative Article",
+                preview: "Could the local mafia be behind the heist? Years later, all roads lead to the Dorchester crew...",
+                content: `
+                    <p>Seven years have passed since the Gardner Heist, and the empty frames still hang on the museum walls. While the FBI has chased leads from Japan to Ireland, local investigators believe the answer has been in Boston's backyard the whole time.</p>
+                    
+                    <p>The leading theory points to the "Dorchester Crew," a gang associated with the Patriarca crime family. Two names come up repeatedly in FBI files: <strong>Bobby Donati</strong> and <strong>Robert Guarente</strong>.</p>
+
+                    <p>Donati, a known mobster, was reportedly worried about his friend Vincent Ferrara being in jail. The theory? Donati stole the art to use as a "bargaining chip." He planned to trade the paintings to the FBI in exchange for getting Ferrara released or getting a reduced sentence.</p>
+
+                    <p>This explains why the paintings were never sold. You can't sell "The Concert" by Vermeer. It's too famous. You can't fence it. But you <em>can</em> trade it.</p>
+                    
+                    <p>"These guys weren't art critics," says one retired detective. "They stole a Napoleonic eagle finial off a flag pole but left a Renaissance painting right next to it. They grabbed what they thought looked expensive. It smells like a mob job."</p>
+
+                    <p>Both Donati and Guarente have since passed away, leaving the location of the art a mystery. Did they pass it to an associate? Is it rotting in a basement in Revere?</p>
+                `
+            },
+            {
+                id: 4,
+                title: "Transcript: The Insider Interview",
+                source: "Channel 4 News Special",
+                date: "March 18, 2005",
+                type: "Interview Transcript",
+                preview: "Reporter John Smith interviews former art thief 'Turbo' regarding the security lapses...",
+                content: `
+                    <p><strong>REPORTER:</strong> I'm here with Myles Connor, a notorious art thief who was actually in jail during the Gardner heist. Myles, you've said before that you cased the museum years prior. Was it difficult?</p>
+
+                    <p><strong>CONNOR:</strong> Difficult? It was a joke. The security was practically non-existent. I went in there once, and the alarm system was just a cheap noise-maker. Kids' stuff.</p>
+
+                    <p><strong>REPORTER:</strong> Do you think it was an inside job? Many people point to the guard, Rick Abath, opening the door.</p>
+
+                    <p><strong>CONNOR:</strong> Opening the door against protocol is the biggest red flag. But look, maybe he was just a scared kid. Two cops show up at 1 AM? You listen to cops. But here is the thing that bothers me: the motion detectors.</p>
+
+                    <p><strong>REPORTER:</strong> What about them?</p>
+
+                    <p><strong>CONNOR:</strong> The FBI logs show the thieves went into the Blue Room. But the motion detectors never picked them up in that room. The only way that happens is if someone who knew the system turned it off, or bypassed it. That suggests inside help.</p>
+
+                    <p><strong>REPORTER:</strong> Or lucky thieves?</p>
+
+                    <p><strong>CONNOR:</strong> There is no such thing as that lucky. To walk out with $500 million in 81 minutes? They knew where they were going.</p>
+                `
+            },
+            {
+                id: 5,
+                title: "Suspect Profile: David Turner",
+                source: "FBI Case Files (Redacted)",
+                date: "Updated 2010",
+                type: "Suspect Dossier",
+                preview: "Subject has links to the Merlino gang. Witness placed a car similar to his near the scene...",
+                content: `
+                    <div class="bg-red-50 p-4 border-l-4 border-red-500 mb-6">
+                        <strong>STATUS:</strong> PERSON OF INTEREST<br>
+                        <strong>NAME:</strong> TURNER, DAVID<br>
+                        <strong>AFFILIATION:</strong> Merlino Gang / Patriarca Family
+                    </div>
+
+                    <p><strong>SUMMARY:</strong> David Turner was a close associate of mob boss Carmello Merlino. FBI informants have suggested Merlino bragged about having the paintings.</p>
+
+                    <p><strong>EVIDENCE LINKS:</strong></p>
+                    <ul class="list-disc ml-6 space-y-2 mb-4">
+                        <li>Turner matches the physical description of one of the "police officers" (younger, slimmer).</li>
+                        <li>Turner was arrested in 1999 for a planned robbery of an armored car—showing he was capable of high-stakes heists.</li>
+                        <li>Witnesses claim to have seen Turner with a large duffel bag in the days following March 18, 1990.</li>
+                    </ul>
+
+                    <p><strong>ALIBI:</strong> Turner claims he was at home. No physical evidence (DNA or fingerprints) places him inside the museum. However, he remains one of the few surviving suspects from that era of the Boston underworld.</p>
+
+                    <p><strong>NOTES:</strong> In recent years, the FBI offered immunity and a payout for the return of the art. Turner has maintained his innocence, or perhaps, he no longer knows where the art is.</p>
+                `
+            },
+            {
+                id: 6,
+                title: "The Security Log Anomalies",
+                source: "Independent Forensics Report",
+                date: "2015 Review",
+                type: "Technical Analysis",
+                preview: "A review of the magnetic lock data from the night of the robbery reveals strange behavior...",
+                content: `
+                    <p>A review of the computerized locking system from the night of March 18, 1990, reveals inconsistences regarding the actions of the night watchman, Rick Abath.</p>
+
+                    <p><strong>The "Door" Issue:</strong></p>
+                    <p>Computer logs indicate that the side entrance door—the one the thieves entered through—was opened briefly at 12:54 AM, exactly 30 minutes before the thieves arrived. Abath stated he opened it to check for a noise. Was this a signal? A dry run?</p>
+
+                    <p><strong>The Motion Detectors:</strong></p>
+                    <p>As noted in previous files, the Blue Room motion detector did not trigger during the time the Manet painting was stolen from that room. However, the detector was functioning properly earlier in the night. This implies the detector was not bypassed, but rather, the thief moved so slowly or knew the "blind spots" perfectly. Or, the item was removed before the alarm was set.</p>
+
+                    <p><strong>Conclusion:</strong></p>
+                    <p>While Abath has always passed polygraph tests and denies involvement, the technical data suggests the thieves had highly specific knowledge of the museum's vulnerabilities.</p>
+                `
+            },
+            // --- NEW RESOURCE 7: Truck Sighting (Third Party involvement) ---
+            {
+                id: 7,
+                title: "FBI Tip Line: Mysterious Truck Sighting",
+                source: "FBI 302 Witness Report",
+                date: "March 20, 1990",
+                type: "Witness Report",
+                preview: "A local resident reported seeing a distinctive box truck parked blocks away from the museum...",
+                content: `
+                    <div class="font-mono text-sm bg-slate-100 p-4 rounded border border-slate-300 mb-6">
+                        <strong>WITNESS ID:</strong> MR. J. DOE<br>
+                        <strong>DATE FILED:</strong> 20 MARCH 1990<br>
+                        <strong>LOCATION:</strong> TWO BLOCKS FROM MUSEUM
+                    </div>
+                    <p><strong>SUMMARY:</strong> Interviewed resident John Doe, 54, who lives three blocks from the museum.</p>
+                    <p>Mr. Doe reports that around 1:00 AM on March 18th, he was walking his dog when he observed a large, older model box truck parked suspiciously on a side street. The truck was painted a faded pale yellow and had a distinctive dent on the rear driver's side.</p>
+                    <p>He recalls seeing two men near the truck, both wearing dark, heavy jackets, not police uniforms. They appeared nervous and were placing a bulky item into the back of the truck. Mr. Doe did not approach them and was unaware of the robbery until the next morning.</p>
+                    <p>This report suggests that a third person or group was involved in the transportation of the artwork, acting as a lookout or driver, which complicates the original two-man "police" narrative. It also suggests the "police" disguise was only used to enter the building, not during the entire escape.</p>
+                `
+            },
+            // --- NEW RESOURCE 8: Financial Pressure/Protocol Failure ---
+            {
+                id: 8,
+                title: "Insurance Payout Freeze",
+                source: "Financial Times Analysis",
+                date: "April 15, 1990",
+                type: "Financial Article",
+                preview: "The museum's insurance company is holding payment due to suspected failure to follow security protocol...",
+                content: `
+                    <p>One month after the catastrophic theft, the Isabella Stewart Gardner Museum is facing financial trouble as its insurance company, London Lloyd's, has frozen all payments related to the stolen art.</p>
+                    <p>The insurance policy contained a clear clause stating that security staff must strictly adhere to protocol. The guard, Richard Abath, admitted to letting the fake police officers in, violating the museum's written rule to never open the door to unverified officers after hours.</p>
+                    <p>This failure to follow protocol gives the insurance company legal grounds to withhold the massive payout, potentially leaving the museum responsible for the loss and unable to fund further security upgrades or recovery efforts. The pressure on the guards and museum management to explain the security lapse is now immense, adding an extra layer of scrutiny to any 'inside job' theories.</p>
+                `
+            }
+        ];
+
+        // --- UPDATED SUSPECTS (5 THEORIES) ---
+        const suspects = [
+            {
+                name: "The Boston Mob",
+                key_figures: "Bobby Donati, Robert Guarente",
+                theory: "Stole the art to use as a trade, or 'Get out of Jail Free' card, not for sale.",
+                probability: 75,
+                color: "bg-red-500"
+            },
+            {
+                name: "The Guard (Insider Theory)",
+                key_figures: "Richard Abath (Guard)",
+                theory: "Complicit in the crime, possibly working with the thieves from the inside.",
+                probability: 55,
+                color: "bg-amber-500"
+            },
+            {
+                name: "The Gangster",
+                key_figures: "David Turner / Merlino Gang",
+                theory: "Used as muscle or one of the two men who entered the museum.",
+                probability: 60,
+                color: "bg-orange-500"
+            },
+            {
+                name: "The Trap",
+                key_figures: "Brian McDevitt",
+                theory: "A con man who may have been involved in the planning or transportation.",
+                probability: 20,
+                color: "bg-blue-500"
+            },
+            {
+                name: "The Getaway Driver",
+                key_figures: "Anonymous Driver / Third Party",
+                theory: "A third individual was involved, handling transport, based on the truck sighting (Doc 7).",
+                probability: 30,
+                color: "bg-teal-500"
+            }
+        ];
+
+        const inventory = [
+            { artist: "Johannes Vermeer", title: "The Concert", type: "Painting (Oil)" },
+            { artist: "Rembrandt", title: "The Storm on the Sea of Galilee", type: "Painting (Oil)" },
+            { artist: "Rembrandt", title: "A Lady and Gentleman in Black", type: "Painting (Oil)" },
+            { artist: "Rembrandt", title: "Self-Portrait", type: "Etching" },
+            { artist: "Govaert Flinck", title: "Landscape with an Obelisk", type: "Painting (Oil)" },
+            { artist: "Edgar Degas", title: "La Sortie de Pesage", type: "Watercolor/Pencil" },
+            { artist: "Edgar Degas", title: "Cortège aux environs de Florence", type: "Pencil Sketch" },
+            { artist: "Edgar Degas", title: "Three Mounted Jockeys", type: "Ink and Wash" },
+            { artist: "Edgar Degas", title: "Program for an Artistic Soirée", type: "Lithograph" },
+            { artist: "Édouard Manet", title: "Chez Tortoni", type: "Oil Sketch" },
+            { artist: "Chinese Bronze", title: "Ancient Bronze Gu", type: "Vase/Artifact" },
+            { artist: "French Empire", title: "Bronze Eagle Finial", type: "Sculpture/Artifact" },
+            { artist: "Unknown", title: "A single piece from a larger tapestry", type: "Tapestry Fragment" }
+        ];
+
+
+        // --- APPLICATION LOGIC ---
+
+        let currentView = 'dashboard';
+        let timelineChart, valueChart;
+
+        /**
+         * Renders the list of documents in the Document Archive view.
+         */
+        function renderDocuments() {
+            const listElement = document.getElementById('document-list');
+            listElement.innerHTML = documents.map(doc => `
+                <button onclick="openDoc(${doc.id})" class="w-full text-left p-4 bg-white hover:bg-slate-100 rounded-lg shadow-sm border border-slate-200 transition duration-150 ease-in-out">
+                    <div class="flex justify-between items-start">
+                        <h4 class="text-lg font-semibold text-slate-800">${doc.title} <span class="text-xs ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full">${doc.type}</span></h4>
+                        <span class="text-xs text-slate-400 font-mono mt-1">${doc.date}</span>
+                    </div>
+                    <p class="text-sm text-slate-600 mt-1 truncate">${doc.preview}</p>
+                    <p class="text-xs text-slate-500 mt-2">Source: ${doc.source}</p>
+                </button>
+            `).join('');
+        }
+        
+        /**
+         * Renders the suspects board with probability bars.
+         */
+        function renderSuspects() {
+            const gridElement = document.getElementById('suspect-grid');
+            gridElement.innerHTML = suspects.map(suspect => `
+                <div class="bg-white rounded-xl p-6 shadow-md border-t-4 border-blue-600">
+                    <h4 class="text-xl font-bold text-slate-900 mb-1">${suspect.name}</h4>
+                    <p class="text-sm text-slate-500 mb-4">Key Figures: ${suspect.key_figures}</p>
+                    
+                    <p class="text-slate-700 leading-snug mb-4">${suspect.theory}</p>
+                    
+                    <div class="mt-4">
+                        <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                            <span>Plausibility (FBI Estimate)</span>
+                            <span>${suspect.probability}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-2.5">
+                            <div class="h-2.5 rounded-full ${suspect.color}" style="width: ${suspect.probability}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Renders the stolen inventory list.
+         */
+        function renderInventory() {
+            const tableBody = document.getElementById('inventory-table');
+            tableBody.innerHTML = inventory.map(item => `
+                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                    <td class="py-3 font-medium">${item.artist}</td>
+                    <td class="py-3">${item.title}</td>
+                    <td class="py-3 text-slate-500">${item.type}</td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Opens the modal view for a specific document.
+         * @param {number} docId - The ID of the document to open.
+         */
+        function openDoc(docId) {
+            const doc = documents.find(d => d.id === docId);
+            if (!doc) return;
+
+            document.getElementById('modal-title').textContent = doc.title;
+            document.getElementById('modal-source').textContent = `${doc.source} | ${doc.date} | ID: Doc ${doc.id}`;
+            document.getElementById('modal-content').innerHTML = doc.content;
+            document.getElementById('doc-modal').classList.remove('hidden');
+        }
+
+        /**
+         * Closes the document reader modal.
+         */
+        function closeModal() {
+            document.getElementById('doc-modal').classList.add('hidden');
+        }
+
+        /**
+         * Initializes the Chart.js visualizations.
+         */
+        function initializeCharts() {
+            // Timeline Chart (Heist Duration vs. Average)
+            const ctxTimeline = document.getElementById('timelineChart').getContext('2d');
+            timelineChart = new Chart(ctxTimeline, {
+                type: 'bar',
+                data: {
+                    labels: ['Gardner Heist', 'Average Burglary'],
+                    datasets: [{
+                        label: 'Duration in Minutes',
+                        data: [81, 10], // 81 minutes vs 10 minutes average
+                        backgroundColor: ['#1d4ed8', '#93c5fd'], // Blue-700 and Blue-300
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Time (Minutes)', color: '#475569' }
+                        }
+                    }
+                }
+            });
+
+            // Value Chart (Gardner Heist vs. Other Thefts)
+            const ctxValue = document.getElementById('valueChart').getContext('2d');
+            valueChart = new Chart(ctxValue, {
+                type: 'bar',
+                data: {
+                    labels: ['Gardner Heist', 'Mona Lisa (1911)', 'The Scream (1994)'],
+                    datasets: [{
+                        label: 'Estimated Value (Millions $)',
+                        data: [500, 100, 120],
+                        backgroundColor: ['#b91c1c', '#fca5a5', '#fca5a5'], // Red-700 and Red-300
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Value (Millions $)', color: '#475569' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        /**
+         * Handles routing between application sections.
+         * @param {string} viewName - The ID suffix of the section to show (e.g., 'dashboard').
+         */
+        function router(viewName) {
+            const views = ['dashboard', 'documents', 'suspects', 'evidence'];
+            currentView = viewName;
+
+            views.forEach(view => {
+                const section = document.getElementById(`view-${view}`);
+                const navButton = document.getElementById(`nav-${view}`);
+                
+                if (section) section.classList.add('hidden');
+                if (navButton) navButton.classList.remove('active-nav');
+            });
+
+            const activeSection = document.getElementById(`view-${viewName}`);
+            const activeNavButton = document.getElementById(`nav-${viewName}`);
+            
+            if (activeSection) {
+                activeSection.classList.remove('hidden');
+                activeSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (activeNavButton) {
+                activeNavButton.classList.add('active-nav');
+            }
+        }
+
+        /**
+         * Toggles the mobile navigation menu.
+         */
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            // Render all dynamic content
+            renderDocuments();
+            renderSuspects();
+            renderInventory();
+
+            // Initialize the charts
+            initializeCharts();
+
+            // Set the initial view
+            router('dashboard'); 
+        };
+    </script>
+</body>
+</html>
+
